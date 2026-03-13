@@ -258,14 +258,11 @@ export default function AdminPage() {
                                                         <>
                                                             <button
                                                                 className={u.approved ? "btn-secondary" : "btn-primary"}
-                                                                onClick={() => handleToggleApproval(u.id, u.approved)}
+                                                                onClick={() => u.approved ? handleDeleteUser(u.id, u.username) : handleToggleApproval(u.id, u.approved)}
                                                                 style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
                                                             >
                                                                 {u.approved ? <X size={12} /> : <Check size={12} />}
                                                                 {u.approved ? "Remove" : "Approve"}
-                                                            </button>
-                                                            <button className="btn-danger" onClick={() => handleDeleteUser(u.id, u.username)} style={{ padding: "4px 10px", fontSize: "11px" }}>
-                                                                <Trash2 size={12} />
                                                             </button>
                                                         </>
                                                     )}
