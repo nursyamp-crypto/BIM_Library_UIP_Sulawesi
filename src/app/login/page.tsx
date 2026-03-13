@@ -5,6 +5,8 @@ import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Box, Eye, EyeOff, Loader2 } from "lucide-react";
+import Image from "next/image";
+import plnLogo from "../../../public/pln-logo.svg";
 
 export default function LoginPage() {
     const [email, setEmail] = useState("");
@@ -72,7 +74,7 @@ export default function LoginPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            backgroundImage: "linear-gradient(rgba(10, 14, 26, 0.5), rgba(10, 14, 26, 0.8)), url('/bg-login.jpg')",
+            backgroundImage: "linear-gradient(rgba(10, 14, 26, 0.5), rgba(10, 14, 26, 0.8)), url('/bg-login.png')",
             backgroundSize: "cover",
             backgroundPosition: "center",
             padding: "20px",
@@ -109,7 +111,7 @@ export default function LoginPage() {
                     marginBottom: "36px",
                 }}>
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: "28px" }}>
-                        <img src="/pln-logo.svg" alt="PT PLN" style={{ height: "80px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }} />
+                        <Image src={plnLogo} alt="PT PLN" height={80} style={{ objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }} />
                     </div>
                     <h1 style={{
                         fontSize: "24px",
