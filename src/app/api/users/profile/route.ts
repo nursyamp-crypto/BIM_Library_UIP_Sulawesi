@@ -2,9 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { supabase } from "@/lib/supabase";
 import bcrypt from "bcryptjs";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import crypto from "crypto";
 
 // GET /api/users/profile - Fetch current user profile
@@ -101,20 +100,32 @@ export async function PATCH(req: NextRequest) {
                 return NextResponse.json({ error: "Format gambar tidak didukung (gunakan JPG, PNG, atau WEBP)" }, { status: 400 });
             }
 
-            // Create dir if not exist
-            const avatarsDir = path.join(process.cwd(), "uploads", "avatars");
-            await mkdir(avatarsDir, { recursive: true }).catch(() => { });
-
-            // Generate filename
+            // Generate unique filename
             const ext = avatarFile.name.split('.').pop() || 'png';
             const fileName = `${userId}-${crypto.randomBytes(4).toString("hex")}.${ext}`;
-            const filePath = path.join(avatarsDir, fileName);
 
-            // Save file
+            // Convert to buffer
             const buffer = Buffer.from(await avatarFile.arrayBuffer());
-            await writeFile(filePath, buffer);
 
-            updateData.avatar = `/api/uploads/avatars/${fileName}`;
+            // Upload directly to Supabase Storage
+            const { data: uploadData, error: uploadError } = await supabase.storage
+                .from('avatars')
+                .upload(fileName, buffer, {
+                    contentType: avatarFile.type,
+                    upsert: true
+                });
+
+            if (uploadError) {
+                console.error("Supabase Upload Error:", uploadError);
+                return NextResponse.json({ error: "Gagal mengunggah gambar ke cloud storage" }, { status: 500 });
+            }
+
+            // Get public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('avatars')
+                .getPublicUrl(fileName);
+
+            updateData.avatar = publicUrl;
         }
 
         // Identity fields — allow setting to empty string (clearing)
