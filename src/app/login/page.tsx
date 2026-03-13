@@ -72,8 +72,11 @@ export default function LoginPage() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            background: "radial-gradient(ellipse at top, #1a1040 0%, #0a0e1a 50%, #0a0e1a 100%)",
+            backgroundImage: "linear-gradient(rgba(10, 14, 26, 0.5), rgba(10, 14, 26, 0.8)), url('/bg-login.jpg')",
+            backgroundSize: "cover",
+            backgroundPosition: "center",
             padding: "20px",
+            position: "relative",
         }}>
             {/* Background decoration */}
             <div style={{
@@ -101,34 +104,21 @@ export default function LoginPage() {
                 width: "100%",
                 maxWidth: "420px",
             }}>
-                {/* Logo */}
                 <div style={{
                     textAlign: "center",
                     marginBottom: "36px",
                 }}>
-                    <div style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        gap: "24px",
-                        marginBottom: "12px",
-                    }}>
-                        <img src="/danantara-logo.svg" alt="Danantara" style={{ height: "54px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.05))" }} />
-                        <div style={{ height: "48px", width: "2px", background: "var(--border)", borderRadius: "2px" }}></div>
-                        <img src="/pln-logo.svg" alt="PT PLN" style={{ height: "64px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.05))" }} />
-                    </div>
                     <div style={{ display: "flex", justifyContent: "center", marginBottom: "28px" }}>
-                        <img src="/uip-sulawesi-logo.png" alt="UIP Sulawesi" style={{ height: "56px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.05))" }} />
+                        <img src="/pln-logo.svg" alt="PT PLN" style={{ height: "80px", objectFit: "contain", filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.5))" }} />
                     </div>
                     <h1 style={{
                         fontSize: "24px",
                         fontWeight: "700",
                         letterSpacing: "-0.02em",
-                        background: "linear-gradient(135deg, #0f172a, var(--accent))",
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
+                        color: "#fff",
+                        textShadow: "0 2px 10px rgba(0,0,0,0.3)",
                     }}>
-                        Private 3D Warehouse
+                        BIM Library PLN
                     </h1>
                     <p style={{ color: "var(--text-muted)", fontSize: "14px", marginTop: "4px" }}>
                         {isRegister ? "Buat akun baru" : "Masuk ke akun Anda"}
@@ -252,26 +242,6 @@ export default function LoginPage() {
                             </>
                         )}
                     </div>
-                </div>
-
-                {/* Demo credentials */}
-                <div style={{
-                    textAlign: "center",
-                    marginTop: "20px",
-                    padding: "16px",
-                    background: "rgba(99, 102, 241, 0.05)",
-                    borderRadius: "12px",
-                    border: "1px solid rgba(99, 102, 241, 0.1)",
-                }}>
-                    <p style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "6px" }}>
-                        Demo credentials
-                    </p>
-                    <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        <strong>Admin:</strong> admin@warehouse.local / admin123
-                    </p>
-                    <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                        <strong>User:</strong> user@warehouse.local / user123
-                    </p>
                 </div>
             </div>
         </div>

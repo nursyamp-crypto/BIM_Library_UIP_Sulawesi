@@ -126,7 +126,7 @@ export default function AdminPage() {
                 const data = await res.json();
                 throw new Error(data.error);
             }
-            toast.success(`User berhasil ${!currentStatus ? 'di-approve' : 'di-revoke'}`);
+            toast.success(`User berhasil ${!currentStatus ? 'di-approve' : 'di-remove'}`);
             fetchData();
         } catch (e: any) {
             toast.error(e.message || "Gagal mengubah status user");
@@ -262,7 +262,7 @@ export default function AdminPage() {
                                                                 style={{ padding: "4px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "4px" }}
                                                             >
                                                                 {u.approved ? <X size={12} /> : <Check size={12} />}
-                                                                {u.approved ? "Revoke" : "Approve"}
+                                                                {u.approved ? "Remove" : "Approve"}
                                                             </button>
                                                             <button className="btn-danger" onClick={() => handleDeleteUser(u.id, u.username)} style={{ padding: "4px 10px", fontSize: "11px" }}>
                                                                 <Trash2 size={12} />
