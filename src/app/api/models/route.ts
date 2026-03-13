@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { validateFileType, validateFileSize, sanitizeFilename, getFileExtension, createAuditLog } from "@/lib/utils";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import { v4 as uuidv4 } from "uuid";
+import { createAuditLog } from "@/lib/utils";
 
 // GET /api/models - List models with search, filter, sort, pagination
 export async function GET(req: NextRequest) {
@@ -97,7 +94,7 @@ export async function GET(req: NextRequest) {
     });
 }
 
-// POST /api/models - Upload a new model
+// POST /api/models - Create a new model record (after client-side upload)
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session) {
@@ -105,71 +102,31 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const formData = await req.formData();
-        const file = formData.get("file") as File;
-        const title = formData.get("title") as string;
-        const description = (formData.get("description") as string) || "";
-        const categoryId = (formData.get("categoryId") as string) || null;
-        const tagsStr = (formData.get("tags") as string) || "";
-        const thumbnail = formData.get("thumbnail") as File | null;
-        const latStr = formData.get("latitude") as string | null;
-        const lngStr = formData.get("longitude") as string | null;
-        const latitude = latStr ? parseFloat(latStr) : null;
-        const longitude = lngStr ? parseFloat(lngStr) : null;
+        const body = await req.json();
+        const {
+            title,
+            description,
+            categoryId,
+            tagsStr,
+            fileUrl,
+            fileName,
+            originalName,
+            fileSize,
+            fileFormat,
+            thumbnailUrl,
+            latitude,
+            longitude
+        } = body;
 
-        if (!file || !title) {
+        if (!fileUrl || !title || !fileName || !fileSize || !fileFormat) {
             return NextResponse.json(
-                { error: "File dan judul wajib diisi" },
+                { error: "Data model tidak lengkap" },
                 { status: 400 }
             );
-        }
-
-        // Validate file type
-        if (!validateFileType(file.name)) {
-            return NextResponse.json(
-                { error: "Tipe file tidak didukung. Format yang diperbolehkan: .skp, .obj, .fbx, .stl, .glb, .gltf, .ifc, .rvt, .rfa" },
-                { status: 400 }
-            );
-        }
-
-        // Validate file size
-        if (!validateFileSize(file.size)) {
-            return NextResponse.json(
-                { error: "Ukuran file melebihi batas maksimum (100MB)" },
-                { status: 400 }
-            );
-        }
-
-        // Create upload directory
-        const uploadDir = path.join(process.cwd(), "uploads", "models");
-        await mkdir(uploadDir, { recursive: true });
-
-        // Generate unique filename
-        const fileId = uuidv4();
-        const ext = getFileExtension(file.name);
-        const safeOriginalName = sanitizeFilename(file.name);
-        const fileName = `${fileId}${ext}`;
-        const filePath = path.join(uploadDir, fileName);
-
-        // Write file
-        const buffer = Buffer.from(await file.arrayBuffer());
-        await writeFile(filePath, buffer);
-
-        // Handle thumbnail
-        let thumbnailPath: string | null = null;
-        if (thumbnail && thumbnail.size > 0) {
-            const thumbDir = path.join(process.cwd(), "uploads", "thumbnails");
-            await mkdir(thumbDir, { recursive: true });
-            const thumbExt = getFileExtension(thumbnail.name);
-            const thumbFileName = `${fileId}${thumbExt}`;
-            const thumbPath = path.join(thumbDir, thumbFileName);
-            const thumbBuffer = Buffer.from(await thumbnail.arrayBuffer());
-            await writeFile(thumbPath, thumbBuffer);
-            thumbnailPath = `/api/uploads/thumbnails/${thumbFileName}`;
         }
 
         // Parse tags
-        const tagNames = tagsStr
+        const tagNames = (tagsStr || "")
             .split(",")
             .map((t: string) => t.trim())
             .filter(Boolean);
@@ -178,15 +135,15 @@ export async function POST(req: NextRequest) {
         const model = await prisma.model3D.create({
             data: {
                 title,
-                description,
+                description: description || "",
                 fileName,
-                originalName: safeOriginalName,
-                filePath: `/api/uploads/models/${fileName}`,
-                fileSize: file.size,
-                fileFormat: ext,
-                thumbnailPath,
-                latitude: latitude && !isNaN(latitude) ? latitude : null,
-                longitude: longitude && !isNaN(longitude) ? longitude : null,
+                originalName: originalName || fileName,
+                filePath: fileUrl,
+                fileSize,
+                fileFormat,
+                thumbnailPath: thumbnailUrl || null,
+                latitude: latitude !== null && latitude !== undefined && !isNaN(latitude) ? latitude : null,
+                longitude: longitude !== null && longitude !== undefined && !isNaN(longitude) ? longitude : null,
                 categoryId: categoryId || undefined,
                 uploaderId: (session.user as any).id,
                 tags: {
@@ -224,10 +181,11 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ model }, { status: 201 });
     } catch (error) {
-        console.error("Upload error:", error);
+        console.error("Create model record error:", error);
         return NextResponse.json(
-            { error: "Gagal mengupload file" },
+            { error: "Gagal menyimpan data model" },
             { status: 500 }
         );
     }
 }
+

@@ -12,6 +12,7 @@ import {
     CheckCircle,
     MapPin,
 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 interface Category {
     id: string;
@@ -115,26 +116,66 @@ export default function UploadPage() {
 
         setLoading(true);
         try {
-            const formData = new FormData();
-            formData.append("file", file);
-            formData.append("title", title.trim());
-            formData.append("description", description.trim());
-            if (categoryId) formData.append("categoryId", categoryId);
-            if (tags) formData.append("tags", tags);
-            if (thumbnail) formData.append("thumbnail", thumbnail);
-            if (coords) {
-                formData.append("latitude", coords.lat.toString());
-                formData.append("longitude", coords.lng.toString());
+            // 1. Upload Model File to Supabase
+            const ext = file.name.substring(file.name.lastIndexOf("."));
+            const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+            const fileName = `${uniqueId}${ext}`;
+            
+            const { error: modelUploadError } = await supabase.storage
+                .from('models')
+                .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+            if (modelUploadError) {
+                console.error("Supabase Upload Error:", modelUploadError);
+                throw new Error("Gagal mengupload file ke penyimpanan (pastikan bucket 'models' sudah diset)");
             }
+
+            const { data: { publicUrl: fileUrl } } = supabase.storage.from('models').getPublicUrl(fileName);
+
+            // 2. Upload Thumbnail if exists
+            let thumbnailUrl: string | null = null;
+            if (thumbnail) {
+                const thumbExt = thumbnail.name.substring(thumbnail.name.lastIndexOf("."));
+                const thumbFileName = `${uniqueId}${thumbExt}`;
+                const { error: thumbUploadError } = await supabase.storage
+                    .from('thumbnails')
+                    .upload(thumbFileName, thumbnail, { cacheControl: '3600', upsert: false });
+
+                if (!thumbUploadError) {
+                    const { data: thumbData } = supabase.storage.from('thumbnails').getPublicUrl(thumbFileName);
+                    thumbnailUrl = thumbData.publicUrl;
+                } else {
+                    console.error("Thumbnail Upload Error:", thumbUploadError);
+                }
+            }
+
+            // 3. Send metadata to Vercel API
+            const payload = {
+                title: title.trim(),
+                description: description.trim(),
+                categoryId: categoryId || null,
+                tagsStr: tags,
+                fileUrl: fileUrl,
+                fileName: fileName,
+                originalName: file.name,
+                fileSize: file.size,
+                fileFormat: ext.toLowerCase(),
+                thumbnailUrl: thumbnailUrl,
+                latitude: coords ? coords.lat : null,
+                longitude: coords ? coords.lng : null
+            };
 
             const res = await fetch("/api/models", {
                 method: "POST",
-                body: formData,
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(payload),
             });
 
             if (!res.ok) {
                 const data = await res.json();
-                throw new Error(data.error || "Upload gagal");
+                throw new Error(data.error || "Gagal menyimpan data model");
             }
 
             const data = await res.json();
