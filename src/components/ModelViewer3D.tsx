@@ -242,7 +242,7 @@ function BoxResizeFaces({ boxRef, controlsRef }: { boxRef: React.RefObject<THREE
                 
                 // Create planes that cover the sides
                 // Since the parent box is unit size (1x1x1) we make the planes 1x1
-                const planeGeomArgs = isX ? [1, 1] : isY ? [1, 1] : [1, 1] as [number, number];
+                const planeGeomArgs: [number, number] = [1, 1];
                 
                 // Rotate the plane to face the right direction
                 const rotation: [number, number, number] = 
