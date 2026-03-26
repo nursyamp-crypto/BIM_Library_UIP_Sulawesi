@@ -47,3 +47,10 @@ dev.db
 
 # uploaded files
 uploads/
+
+deploy-package.zip
+background login.png
+check-user.ts
+test-db.ts
+prisma_error.log
+prisma_out.log

@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
     Upload,
     X,
     FileBox,
-    Image,
+    Image as ImageIcon,
     Loader2,
     CheckCircle,
     MapPin,
+    Camera,
+    Box
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Canvas, useThree } from "@react-three/fiber";
+import { Stage, useGLTF } from "@react-three/drei";
 
 interface Category {
     id: string;
@@ -30,17 +34,74 @@ function formatSize(bytes: number) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + s[i];
 }
 
+import * as THREE from "three";
+
+// Helper for Auto Thumbnail
+function ModelLoader({ url, onLoaded }: { url: string, onLoaded: (gl: any, scene: any, camera: any) => void }) {
+    const { scene } = useGLTF(url);
+    const { gl, camera } = useThree();
+
+    useEffect(() => {
+        if (scene) {
+            onLoaded(gl, scene, camera);
+        }
+    }, [scene, gl, camera, onLoaded]);
+
+    return <Stage environment="city" intensity={0.6}><primitive object={scene} /></Stage>;
+}
+
+function AutoThumbnailGenerator({ file, onGenerated }: { file: File, onGenerated: (file: File) => void }) {
+    const [url, setUrl] = useState("");
+
+    useEffect(() => {
+        const u = URL.createObjectURL(file);
+        setUrl(u);
+        return () => URL.revokeObjectURL(u);
+    }, [file]);
+
+    if (!url) return null;
+
+    return (
+        <div style={{ position: "absolute", top: "-9999px", left: "-9999px", width: "512px", height: "512px", visibility: "hidden", pointerEvents: "none" }}>
+            <Canvas gl={{ preserveDrawingBuffer: true, alpha: true }}>
+                <Suspense fallback={null}>
+                    <ModelLoader url={url} onLoaded={(gl, scene, camera) => {
+                        setTimeout(() => {
+                            // Set solid background to avoid black JPEG
+                            scene.background = new THREE.Color(0xf1f5f9);
+                            gl.render(scene, camera);
+                            gl.domElement.toBlob((blob: Blob | null) => {
+                                if (blob) {
+                                    const thumbName = file.name.replace(/\.[^/.]+$/, ".jpg");
+                                    const thumbFile = new File([blob], thumbName, { type: "image/jpeg" });
+                                    onGenerated(thumbFile);
+                                }
+                            }, 'image/jpeg', 0.85);
+                        }, 1000); // 1s wait helps to ensure textures and Stage are fully ready
+                    }} />
+                </Suspense>
+            </Canvas>
+        </div>
+    );
+}
+
 export default function UploadPage() {
     const router = useRouter();
     const fileRef = useRef<HTMLInputElement>(null);
+    const glbRef = useRef<HTMLInputElement>(null);
     const thumbRef = useRef<HTMLInputElement>(null);
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(false);
     const [dragOver, setDragOver] = useState(false);
+    const [glbDragOver, setGlbDragOver] = useState(false);
 
     const [file, setFile] = useState<File | null>(null);
+    const [glbFile, setGlbFile] = useState<File | null>(null);
     const [thumbnail, setThumbnail] = useState<File | null>(null);
+    const [generatingThumb, setGeneratingThumb] = useState(false);
+
+    const requiresGlb = file && !(file.name.toLowerCase().endsWith(".glb") || file.name.toLowerCase().endsWith(".gltf"));
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [categoryId, setCategoryId] = useState("");
@@ -85,22 +146,43 @@ export default function UploadPage() {
         return true;
     };
 
+    const processFileSelection = (f: File) => {
+        if (validateFile(f)) {
+            setFile(f);
+            if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "));
+            
+            // Auto generate thumb for 3D formats
+            setThumbnail(null);
+            setGlbFile(null);
+            const ext = f.name.toLowerCase();
+            if (ext.endsWith(".glb") || ext.endsWith(".gltf")) {
+                setGeneratingThumb(true);
+            } else {
+                setGeneratingThumb(false);
+            }
+        }
+    };
+
+    const processGlbSelection = (f: File) => {
+        const ext = f.name.toLowerCase();
+        if (ext.endsWith(".glb") || ext.endsWith(".gltf")) {
+            setGlbFile(f);
+            setGeneratingThumb(true);
+        } else {
+            toast.error("File preview harus berformat .glb atau .gltf");
+        }
+    };
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setDragOver(false);
         const f = e.dataTransfer.files[0];
-        if (f && validateFile(f)) {
-            setFile(f);
-            if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "));
-        }
+        if (f) processFileSelection(f);
     };
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         const f = e.target.files?.[0];
-        if (f && validateFile(f)) {
-            setFile(f);
-            if (!title) setTitle(f.name.replace(/\.[^/.]+$/, "").replace(/[_-]/g, " "));
-        }
+        if (f) processFileSelection(f);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -114,25 +196,42 @@ export default function UploadPage() {
             return;
         }
 
+        if (requiresGlb && !glbFile) {
+            toast.error("File .glb pendamping wajib diupload untuk format ini");
+            return;
+        }
+
         setLoading(true);
         try {
+            const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
+
             // 1. Upload Model File to Supabase
             const ext = file.name.substring(file.name.lastIndexOf("."));
-            const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString();
             const fileName = `${uniqueId}${ext}`;
             
             const { error: modelUploadError } = await supabase.storage
                 .from('models')
                 .upload(fileName, file, { cacheControl: '3600', upsert: false });
 
-            if (modelUploadError) {
-                console.error("Supabase Upload Error:", modelUploadError);
-                throw new Error("Gagal mengupload file ke penyimpanan (pastikan bucket 'models' sudah diset)");
-            }
+            if (modelUploadError) throw new Error("Gagal mengupload file asli ke penyimpanan");
 
             const { data: { publicUrl: fileUrl } } = supabase.storage.from('models').getPublicUrl(fileName);
 
-            // 2. Upload Thumbnail if exists
+            // 2. Upload GLB File if required
+            let glbFileUrl: string | null = null;
+            if (requiresGlb && glbFile) {
+                const glbExt = glbFile.name.substring(glbFile.name.lastIndexOf("."));
+                const glbName = `${uniqueId}_preview${glbExt}`;
+                const { error: glbUploadError } = await supabase.storage
+                    .from('models')
+                    .upload(glbName, glbFile, { cacheControl: '3600', upsert: false });
+                
+                if (glbUploadError) throw new Error("Gagal mengupload file preview GLB");
+                const { data: glbData } = supabase.storage.from('models').getPublicUrl(glbName);
+                glbFileUrl = glbData.publicUrl;
+            }
+
+            // 3. Upload Thumbnail if exists
             let thumbnailUrl: string | null = null;
             if (thumbnail) {
                 const thumbExt = thumbnail.name.substring(thumbnail.name.lastIndexOf("."));
@@ -161,6 +260,7 @@ export default function UploadPage() {
                 fileSize: file.size,
                 fileFormat: ext.toLowerCase(),
                 thumbnailUrl: thumbnailUrl,
+                glbFileUrl: glbFileUrl,
                 latitude: coords ? coords.lat : null,
                 longitude: coords ? coords.lng : null
             };
@@ -195,6 +295,17 @@ export default function UploadPage() {
                 <p className="page-subtitle">Upload file model 3D ke warehouse</p>
             </div>
 
+            {generatingThumb && (file || glbFile) && (
+                <AutoThumbnailGenerator 
+                    file={glbFile || file!} 
+                    onGenerated={(thumbFile) => {
+                        setThumbnail(thumbFile);
+                        setGeneratingThumb(false);
+                        toast.success("Thumbnail 3D berhasil di-generate secara otomatis!");
+                    }} 
+                />
+            )}
+
             <form onSubmit={handleSubmit}>
                 {/* File Upload Zone */}
                 <div
@@ -224,21 +335,21 @@ export default function UploadPage() {
                             <button
                                 type="button"
                                 className="btn-secondary"
-                                onClick={(e) => { e.stopPropagation(); setFile(null); }}
+                                onClick={(e) => { e.stopPropagation(); setFile(null); setGlbFile(null); setThumbnail(null); setGeneratingThumb(false); }}
                                 style={{ fontSize: "12px", padding: "6px 14px" }}
                             >
                                 <X size={12} />
-                                Ganti File
+                                Ganti File Asli
                             </button>
                         </div>
                     ) : (
                         <div>
                             <FileBox size={40} style={{ color: "var(--text-muted)", marginBottom: "12px" }} />
                             <div style={{ fontSize: "15px", fontWeight: "500", marginBottom: "6px" }}>
-                                Drag & drop file di sini
+                                Drag & drop file asli di sini
                             </div>
                             <div style={{ fontSize: "13px", color: "var(--text-muted)", marginBottom: "4px" }}>
-                                atau klik untuk memilih file
+                                format asli seperti .rvt, .skp, dll
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
                                 Format: {ALLOWED_FORMATS.join(", ")} • Max: 100MB
@@ -246,6 +357,72 @@ export default function UploadPage() {
                         </div>
                     )}
                 </div>
+
+                {/* GLB Upload Zone (if required) */}
+                {requiresGlb && (
+                    <div style={{ marginBottom: "24px" }}>
+                        <label className="label">File Preview (.glb / .gltf) <span style={{color: "var(--accent)"}}>*Wajib</span></label>
+                        <div
+                            className={`upload-zone ${glbDragOver ? "dragover" : ""}`}
+                            onDragOver={(e) => { e.preventDefault(); setGlbDragOver(true); }}
+                            onDragLeave={() => setGlbDragOver(false)}
+                            onDrop={(e) => {
+                                e.preventDefault();
+                                setGlbDragOver(false);
+                                const f = e.dataTransfer.files[0];
+                                if (f) processGlbSelection(f);
+                            }}
+                            onClick={() => glbRef.current?.click()}
+                            style={{ 
+                                padding: "24px", 
+                                background: glbFile ? "rgba(16, 185, 129, 0.05)" : "rgba(30, 41, 59, 0.3)",
+                                borderStyle: glbFile ? "solid" : "dashed",
+                                borderColor: glbFile ? "var(--success)" : "var(--accent)"
+                            }}
+                        >
+                            <input
+                                ref={glbRef}
+                                type="file"
+                                accept=".glb,.gltf"
+                                onChange={(e) => {
+                                    const f = e.target.files?.[0];
+                                    if (f) processGlbSelection(f);
+                                }}
+                                style={{ display: "none" }}
+                            />
+                            {glbFile ? (
+                                <div>
+                                    <CheckCircle size={32} style={{ color: "var(--success)", marginBottom: "8px" }} />
+                                    <div style={{ fontSize: "14px", fontWeight: "600", marginBottom: "4px" }}>
+                                        {glbFile.name}
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "12px" }}>
+                                        {formatSize(glbFile.size)} • Siap dipreview
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="btn-secondary"
+                                        onClick={(e) => { e.stopPropagation(); setGlbFile(null); setThumbnail(null); setGeneratingThumb(false); }}
+                                        style={{ fontSize: "12px", padding: "4px 12px" }}
+                                    >
+                                        <X size={12} />
+                                        Ganti GLB
+                                    </button>
+                                </div>
+                            ) : (
+                                <div>
+                                    <Box size={32} style={{ color: "var(--accent)", marginBottom: "8px" }} />
+                                    <div style={{ fontSize: "14px", fontWeight: "500", marginBottom: "4px" }}>
+                                        Upload versi ekspor (.glb)
+                                    </div>
+                                    <div style={{ fontSize: "12px", color: "var(--text-muted)" }}>
+                                        Diperlukan agar model bisa diputar di web
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Model Info Form */}
                 <div style={{
@@ -302,29 +479,63 @@ export default function UploadPage() {
                     <div style={{ marginBottom: "24px" }}>
                         <label className="label">Thumbnail / Preview Image</label>
                         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                            <button
-                                type="button"
-                                className="btn-secondary"
-                                onClick={() => thumbRef.current?.click()}
-                                style={{ fontSize: "13px" }}
-                            >
-                                <Image size={14} />
-                                {thumbnail ? "Ganti Thumbnail" : "Pilih Thumbnail"}
-                            </button>
-                            {thumbnail && (
-                                <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
-                                    {thumbnail.name}
-                                </span>
+                            {generatingThumb ? (
+                                <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", color: "var(--accent)", padding: "8px 0" }}>
+                                    <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                                    <span>Sedang men-generate thumbnail 3D otomatis...</span>
+                                </div>
+                            ) : (
+                                <>
+                                    {thumbnail ? (
+                                        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                                            <div style={{ 
+                                                width: "60px", 
+                                                height: "60px", 
+                                                borderRadius: "8px", 
+                                                overflow: "hidden",
+                                                border: "1px solid var(--border)"
+                                            }}>
+                                                <img 
+                                                    src={URL.createObjectURL(thumbnail)} 
+                                                    alt="Thumbnail Preview" 
+                                                    style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+                                                />
+                                            </div>
+                                            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                                                <span style={{ fontSize: "13px", color: "var(--success)", display: "flex", alignItems: "center", gap: "4px" }}>
+                                                    <Camera size={14} /> Thumbnail siap
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => thumbRef.current?.click()}
+                                                    style={{ fontSize: "12px", background: "none", border: "none", color: "var(--accent-light)", cursor: "pointer", padding: 0, textAlign: "left" }}
+                                                >
+                                                    Ganti Manual
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            className="btn-secondary"
+                                            onClick={() => thumbRef.current?.click()}
+                                            style={{ fontSize: "13px" }}
+                                        >
+                                            <ImageIcon size={14} />
+                                            Pilih Thumbnail
+                                        </button>
+                                    )}
+                                    <input
+                                        ref={thumbRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files?.[0]) setThumbnail(e.target.files[0]);
+                                        }}
+                                        style={{ display: "none" }}
+                                    />
+                                </>
                             )}
-                            <input
-                                ref={thumbRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => {
-                                    if (e.target.files?.[0]) setThumbnail(e.target.files[0]);
-                                }}
-                                style={{ display: "none" }}
-                            />
                         </div>
                     </div>
 
@@ -355,7 +566,7 @@ export default function UploadPage() {
                     <button
                         type="submit"
                         className="btn-primary"
-                        disabled={loading || !file}
+                        disabled={loading || !file || generatingThumb || (!!requiresGlb && !glbFile)}
                         style={{ width: "100%", justifyContent: "center", padding: "14px", fontSize: "15px" }}
                     >
                         {loading ? (

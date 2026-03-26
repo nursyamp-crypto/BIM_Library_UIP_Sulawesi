@@ -42,6 +42,7 @@ interface ModelDetail {
     fileSize: number;
     fileFormat: string;
     thumbnailPath: string | null;
+    glbFilePath: string | null;
     downloadCount: number;
     createdAt: string;
     updatedAt: string;
@@ -104,7 +105,7 @@ export default function ModelDetailPage() {
     const [loading, setLoading] = useState(true);
     const [downloading, setDownloading] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [show3D, setShow3D] = useState(false);
+    const [show3D, setShow3D] = useState(true);
 
     // Comments state
     const [comments, setComments] = useState<Comment[]>([]);
@@ -114,7 +115,7 @@ export default function ModelDetailPage() {
 
     const isAdmin = (session?.user as any)?.role === "ADMIN";
     const canDelete = isAdmin;
-    const is3DViewable = model?.fileFormat === ".glb" || model?.fileFormat === ".gltf";
+    const is3DViewable = model?.fileFormat === ".glb" || model?.fileFormat === ".gltf" || !!model?.glbFilePath;
 
     const fetchComments = useCallback(async () => {
         try {
@@ -248,8 +249,8 @@ export default function ModelDetailPage() {
                         marginBottom: "24px",
                     }}>
                         {show3D && is3DViewable ? (
-                            <div style={{ height: "450px" }}>
-                                <ModelViewer3D modelPath={model.filePath} />
+                            <div style={{ height: "75vh", minHeight: "500px" }}>
+                                <ModelViewer3D modelPath={model.glbFilePath || model.filePath} />
                             </div>
                         ) : (
                             <div style={{

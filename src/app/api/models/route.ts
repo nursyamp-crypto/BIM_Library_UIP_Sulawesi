@@ -114,6 +114,7 @@ export async function POST(req: NextRequest) {
             fileSize,
             fileFormat,
             thumbnailUrl,
+            glbFileUrl,
             latitude,
             longitude
         } = body;
@@ -142,6 +143,7 @@ export async function POST(req: NextRequest) {
                 fileSize,
                 fileFormat,
                 thumbnailPath: thumbnailUrl || null,
+                glbFilePath: glbFileUrl || null,
                 latitude: latitude !== null && latitude !== undefined && !isNaN(latitude) ? latitude : null,
                 longitude: longitude !== null && longitude !== undefined && !isNaN(longitude) ? longitude : null,
                 categoryId: categoryId || undefined,

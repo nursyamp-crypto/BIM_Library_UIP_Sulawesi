@@ -51,6 +51,7 @@ model Model3D {
   fileSize      Int
   fileFormat    String
   thumbnailPath String?
+  glbFilePath   String?
   downloadCount Int       @default(0)
   latitude      Float?
   longitude     Float?
