@@ -95,7 +95,7 @@ export default function ProtectedLayout({
                             <div style={{ fontSize: "12px", fontWeight: "700", color: "rgba(255,255,255,0.9)", letterSpacing: "0.03em", lineHeight: "1.4" }}>
                                 Unit Induk Pembangunan Sulawesi
                             </div>
-                            <div style={{ fontSize: "11px", fontWeight: "500", color: "rgba(255,255,255,0.6)", marginTop: "2px" }}>
+                            <div style={{ fontSize: "22px", fontWeight: "800", color: "#ffffff", marginTop: "8px", letterSpacing: "0.1em", textTransform: "uppercase", textShadow: "0 4px 12px rgba(0,0,0,0.15)" }}>
                                 BIM Library
                             </div>
                         </div>
