@@ -38,7 +38,9 @@ export async function createAuditLog(
     action: string,
     targetType: string,
     targetId?: string,
-    details?: string
+    details?: string,
+    ipAddress?: string,
+    userAgent?: string
 ) {
     await prisma.auditLog.create({
         data: {
@@ -47,6 +49,8 @@ export async function createAuditLog(
             targetType,
             targetId: targetId || null,
             details: details || "",
+            ipAddress: ipAddress || null,
+            userAgent: userAgent || null,
         },
     });
 }

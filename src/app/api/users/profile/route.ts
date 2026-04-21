@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { supabase } from "@/lib/supabase";
+import { createAuditLog } from "@/lib/utils";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -143,6 +144,16 @@ export async function PATCH(req: NextRequest) {
             where: { id: userId },
             data: updateData,
         });
+
+        // Audit log
+        const changes = Object.keys(updateData).join(", ");
+        await createAuditLog(
+            userId,
+            "PROFILE_UPDATE",
+            "USER",
+            userId,
+            `Updated profile fields: ${changes}`
+        );
 
         return NextResponse.json({
             message: "Profil berhasil diperbarui",

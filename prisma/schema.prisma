@@ -16,11 +16,14 @@ model User {
   role      String    @default("USER") // ADMIN or USER
   avatar    String?
   approved  Boolean   @default(false)
+  held      Boolean   @default(false)
   fullName   String?
   birthPlace String?
   birthDate  DateTime?
   address    String?
   division   String?
+  ipAddress  String?
+  userAgent  String?
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
@@ -32,6 +35,8 @@ model User {
 model Comment {
   id        String   @id @default(cuid())
   content   String
+  attachments Json?
+  pollOptions Json?
   modelId   String
   userId    String
   createdAt DateTime @default(now())
@@ -52,6 +57,7 @@ model Model3D {
   fileFormat    String
   thumbnailPath String?
   glbFilePath   String?
+  version       Int       @default(1)
   downloadCount Int       @default(0)
   latitude      Float?
   longitude     Float?
@@ -66,6 +72,7 @@ model Model3D {
 
   tags          ModelTag[]
   comments      Comment[]
+  versions      ModelVersion[]
 }
 
 model Category {
@@ -100,8 +107,35 @@ model AuditLog {
   targetType String
   targetId   String?
   details    String   @default("")
+  ipAddress  String?
+  userAgent  String?
   createdAt  DateTime @default(now())
 
   userId     String
   user       User     @relation(fields: [userId], references: [id])
 }
+
+model ModelVersion {
+  id           String   @id @default(uuid())
+  modelId      String
+  version      Int
+  fileName     String
+  originalName String
+  filePath     String
+  fileSize     Int
+  fileFormat   String
+  glbFilePath  String?
+  changeNote   String   @db.Text
+  createdAt    DateTime @default(now())
+
+  model Model3D @relation(fields: [modelId], references: [id], onDelete: Cascade)
+}
+
+model OTP {
+  id        String   @id @default(uuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+

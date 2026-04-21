@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { createAuditLog } from "@/lib/utils";
 import bcrypt from "bcryptjs";
 
 // GET /api/admin/users - List all users (admin only)
@@ -18,6 +19,7 @@ export async function GET() {
             username: true,
             role: true,
             approved: true,
+            held: true,
             createdAt: true,
             _count: {
                 select: { models: true },
@@ -54,9 +56,17 @@ export async function POST(req: NextRequest) {
                 username,
                 password: hashedPassword,
                 role: role || "USER",
-                approved: true, // Auto decide that admin creations are approved
+                approved: true,
             },
         });
+
+        await createAuditLog(
+            (session.user as any).id,
+            "CREATE_USER",
+            "USER",
+            user.id,
+            `Created user: ${username} (${email}) with role ${user.role}`
+        );
 
         return NextResponse.json(
             {
@@ -99,12 +109,26 @@ export async function DELETE(req: NextRequest) {
         );
     }
 
+    // Get user info before deleting for audit log
+    const targetUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { username: true, email: true },
+    });
+
     await prisma.user.delete({ where: { id: userId } });
+
+    await createAuditLog(
+        (session.user as any).id,
+        "DELETE_USER",
+        "USER",
+        userId,
+        `Deleted user: ${targetUser?.username} (${targetUser?.email})`
+    );
 
     return NextResponse.json({ message: "User berhasil dihapus" });
 }
 
-// PATCH /api/admin/users - Toggle user approval
+// PATCH /api/admin/users - Toggle user approval or change role
 export async function PATCH(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session || (session.user as any).role !== "ADMIN") {
@@ -112,13 +136,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     try {
-        const { id, approved } = await req.json();
+        const { id, approved, role, held } = await req.json();
 
         if (!id) {
             return NextResponse.json({ error: "User ID required" }, { status: 400 });
         }
 
-        // Don't allow changing your own approval status
+        // Don't allow changing your own status
         if (id === (session.user as any).id) {
             return NextResponse.json(
                 { error: "Tidak bisa mengubah status diri sendiri" },
@@ -126,10 +150,50 @@ export async function PATCH(req: NextRequest) {
             );
         }
 
+        const updateData: any = {};
+        if (approved !== undefined) {
+            updateData.approved = approved;
+        }
+        if (role !== undefined) {
+            updateData.role = role;
+        }
+        if (held !== undefined) {
+            updateData.held = held;
+        }
+
         const user = await prisma.user.update({
             where: { id },
-            data: { approved },
+            data: updateData,
         });
+
+        // Audit log
+        if (role !== undefined) {
+            await createAuditLog(
+                (session.user as any).id,
+                "CHANGE_ROLE",
+                "USER",
+                id,
+                `Changed role of ${user.username} to ${role}`
+            );
+        }
+        if (approved !== undefined) {
+            await createAuditLog(
+                (session.user as any).id,
+                approved ? "APPROVE_USER" : "REMOVE_USER",
+                "USER",
+                id,
+                `${approved ? "Approved" : "Removed"} user: ${user.username}`
+            );
+        }
+        if (held !== undefined) {
+            await createAuditLog(
+                (session.user as any).id,
+                held ? "HOLD_USER" : "UNHOLD_USER",
+                "USER",
+                id,
+                `${held ? "Held (suspended)" : "Unhold (reactivated)"} user: ${user.username}`
+            );
+        }
 
         return NextResponse.json({ message: "Status user berhasil diubah", user });
     } catch (error) {
@@ -139,4 +203,3 @@ export async function PATCH(req: NextRequest) {
         );
     }
 }
-

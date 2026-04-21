@@ -793,8 +793,13 @@ export default function ModelViewer3D({ modelPath }: { modelPath: string }) {
                 >
                     <Suspense fallback={null}>
 
+                        {/* Adding generic lighting to prevent darkness when remote HDR map fails */}
+                        <ambientLight intensity={1.0} />
+                        <directionalLight position={[10, 10, 10]} intensity={1.5} />
+                        <directionalLight position={[-10, -10, -10]} intensity={0.5} />
                         
-                        <Stage environment="city" intensity={0.6}>
+                        {/* Disable remote HDR fetch by setting environment={null} */}
+                        <Stage environment={null} intensity={0.6}>
                             <Model 
                                 url={modelPath} 
                                 selectedUuid={selectedObject?.uuid || null}

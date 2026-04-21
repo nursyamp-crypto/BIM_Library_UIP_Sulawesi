@@ -28,6 +28,9 @@ export async function GET(
             tags: {
                 include: { tag: true },
             },
+            versions: {
+                orderBy: { createdAt: "desc" }
+            }
         },
     });
 
@@ -88,3 +91,34 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Model berhasil dihapus" });
 }
+
+// PATCH /api/models/[id] - Update model title
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string }> }
+) {
+    const session = await getServerSession(authOptions);
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+    const body = await req.json();
+
+    const model = await prisma.model3D.findUnique({ where: { id } });
+    if (!model) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    const currentUser = session.user as any;
+    if (currentUser.role !== "ADMIN" && model.uploaderId !== currentUser.id) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    if (body.title) {
+        await prisma.model3D.update({
+            where: { id },
+            data: { title: body.title }
+        });
+        await createAuditLog(currentUser.id, "UPDATE", "MODEL", id, `Renamed model to: ${body.title}`);
+    }
+
+    return NextResponse.json({ success: true });
+}
+

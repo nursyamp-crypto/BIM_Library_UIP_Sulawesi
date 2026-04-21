@@ -13,6 +13,8 @@ export const metadata: Metadata = {
   description: "Repositori file 3D model privat dengan sistem autentikasi",
 };
 
+import AIAssistant from "@/components/AIAssistant";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -21,7 +23,10 @@ export default function RootLayout({
   return (
     <html lang="id" className="dark">
       <body className={`${inter.variable} font-sans antialiased`}>
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <AIAssistant />
+        </Providers>
       </body>
     </html>
   );

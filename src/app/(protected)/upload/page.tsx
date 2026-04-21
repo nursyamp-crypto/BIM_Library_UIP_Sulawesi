@@ -36,18 +36,24 @@ function formatSize(bytes: number) {
 
 import * as THREE from "three";
 
-// Helper for Auto Thumbnail
 function ModelLoader({ url, onLoaded }: { url: string, onLoaded: (gl: any, scene: any, camera: any) => void }) {
-    const { scene } = useGLTF(url);
-    const { gl, camera } = useThree();
+    const { scene: modelScene } = useGLTF(url);
+    const { gl, camera, scene: rootScene } = useThree();
 
     useEffect(() => {
-        if (scene) {
-            onLoaded(gl, scene, camera);
+        if (modelScene) {
+            onLoaded(gl, rootScene, camera);
         }
-    }, [scene, gl, camera, onLoaded]);
+    }, [modelScene, gl, rootScene, camera, onLoaded]);
 
-    return <Stage environment="city" intensity={0.6}><primitive object={scene} /></Stage>;
+    return (
+        <Stage intensity={1} environment="city" adjustCamera={true}>
+            <ambientLight intensity={2.5} />
+            <directionalLight position={[10, 10, 10]} intensity={3.5} />
+            <directionalLight position={[-10, 5, -10]} intensity={1.5} />
+            <primitive object={modelScene} />
+        </Stage>
+    );
 }
 
 function AutoThumbnailGenerator({ file, onGenerated }: { file: File, onGenerated: (file: File) => void }) {
@@ -62,22 +68,25 @@ function AutoThumbnailGenerator({ file, onGenerated }: { file: File, onGenerated
     if (!url) return null;
 
     return (
-        <div style={{ position: "absolute", top: "-9999px", left: "-9999px", width: "512px", height: "512px", visibility: "hidden", pointerEvents: "none" }}>
+        <div style={{ position: "fixed", top: "-2000px", left: "-2000px", width: "512px", height: "512px", opacity: 0.01, pointerEvents: "none", zIndex: -100 }}>
             <Canvas gl={{ preserveDrawingBuffer: true, alpha: true }}>
                 <Suspense fallback={null}>
                     <ModelLoader url={url} onLoaded={(gl, scene, camera) => {
                         setTimeout(() => {
-                            // Set solid background to avoid black JPEG
+                            // Ensure background is solid white/gray instead of transparent which turns black in some formats
+                            gl.setClearColor(0xf1f5f9, 1);
                             scene.background = new THREE.Color(0xf1f5f9);
                             gl.render(scene, camera);
+                            
                             gl.domElement.toBlob((blob: Blob | null) => {
                                 if (blob) {
-                                    const thumbName = file.name.replace(/\.[^/.]+$/, ".jpg");
-                                    const thumbFile = new File([blob], thumbName, { type: "image/jpeg" });
+                                    // Use PNG to preserve transparency just in case, avoiding JPEG black-bg issue
+                                    const thumbName = file.name.replace(/\.[^/.]+$/, ".png");
+                                    const thumbFile = new File([blob], thumbName, { type: "image/png" });
                                     onGenerated(thumbFile);
                                 }
-                            }, 'image/jpeg', 0.85);
-                        }, 1000); // 1s wait helps to ensure textures and Stage are fully ready
+                            }, 'image/png');
+                        }, 1500); // 1.5s wait helps to ensure textures and Stage are fully lit
                     }} />
                 </Suspense>
             </Canvas>

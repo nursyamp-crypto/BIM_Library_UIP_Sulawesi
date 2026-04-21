@@ -46,10 +46,10 @@ export async function POST(
 
     try {
         const { id } = await params;
-        const { content } = await req.json();
+        const { content, attachments, pollOptions } = await req.json();
         const userId = (session.user as any).id;
 
-        if (!content || content.trim() === "") {
+        if (!content && (!attachments || attachments.length === 0) && (!pollOptions || pollOptions.length === 0)) {
             return NextResponse.json({ error: "Komentar tidak boleh kosong" }, { status: 400 });
         }
 
@@ -61,7 +61,9 @@ export async function POST(
 
         const comment = await prisma.comment.create({
             data: {
-                content: content.trim(),
+                content: content?.trim() || "",
+                attachments: attachments || null,
+                pollOptions: pollOptions || null,
                 modelId: id,
                 userId,
             },

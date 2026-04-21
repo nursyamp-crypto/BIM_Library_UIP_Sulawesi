@@ -318,7 +318,7 @@ export default function DashboardPage() {
             </div>
 
             {/* PLN Profile Slideshow */}
-            <div style={{
+            <div className="dashboard-slideshow" style={{
                 position: "relative",
                 borderRadius: "16px",
                 overflow: "hidden",

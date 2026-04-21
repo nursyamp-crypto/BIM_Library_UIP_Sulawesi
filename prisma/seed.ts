@@ -40,14 +40,12 @@ async function main() {
 
     // Create categories
     const categories = [
-        { name: "Architecture", slug: "architecture", description: "Architectural models and buildings" },
-        { name: "Furniture", slug: "furniture", description: "Interior furniture and fixtures" },
-        { name: "Mechanical", slug: "mechanical", description: "Mechanical parts and assemblies" },
-        { name: "Nature", slug: "nature", description: "Trees, plants, and natural elements" },
-        { name: "Vehicles", slug: "vehicles", description: "Cars, trucks, and transportation" },
-        { name: "Characters", slug: "characters", description: "Human and character models" },
-        { name: "Electronics", slug: "electronics", description: "Electronic devices and gadgets" },
-        { name: "Infrastructure", slug: "infrastructure", description: "Roads, bridges, and infrastructure" },
+        { name: "Arsitektur", slug: "arsitektur", description: "BIM models for architecture" },
+        { name: "Struktur", slug: "struktur", description: "Structural elements and engineering" },
+        { name: "Mekanikal", slug: "mekanikal", description: "Mechanical parts and assemblies (HVAC)" },
+        { name: "Elektrikal", slug: "elektrikal", description: "Electrical grids, substations, and equipment" },
+        { name: "Infrastruktur", slug: "infrastruktur", description: "Roads, bridges, and infrastructure" },
+        { name: "Landscape", slug: "landscape", description: "Terrain, landscaping, and outdoor environments" },
     ];
 
     for (const cat of categories) {

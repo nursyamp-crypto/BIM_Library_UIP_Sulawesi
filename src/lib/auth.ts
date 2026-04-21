@@ -11,10 +11,13 @@ export const authOptions: NextAuthOptions = {
                 email: { label: "Email", type: "email" },
                 password: { label: "Password", type: "password" },
             },
-            async authorize(credentials) {
+            async authorize(credentials, req) {
                 if (!credentials?.email || !credentials?.password) {
                     throw new Error("Email dan password harus diisi");
                 }
+
+                const ipAddress = req?.headers?.["x-forwarded-for"] || "Unknown IP";
+                const userAgent = req?.headers?.["user-agent"] || "Unknown Device";
 
                 const user = await prisma.user.findFirst({
                     where: {
@@ -41,6 +44,23 @@ export const authOptions: NextAuthOptions = {
                 if (!user.approved && user.role !== "ADMIN") {
                     throw new Error("Akun Anda belum disetujui oleh Administrator");
                 }
+
+                if (user.held) {
+                    throw new Error("Akun Anda ditangguhkan sementara oleh Administrator. Silakan hubungi admin untuk informasi lebih lanjut.");
+                }
+
+                // Audit log for login
+                await prisma.auditLog.create({
+                    data: {
+                        userId: user.id,
+                        action: "LOGIN",
+                        targetType: "USER",
+                        targetId: user.id,
+                        details: `User ${user.username} logged in`,
+                        ipAddress,
+                        userAgent,
+                    },
+                });
 
                 return {
                     id: user.id,
