@@ -24,7 +24,7 @@ interface Category {
 }
 
 const ALLOWED_FORMATS = [".skp", ".obj", ".fbx", ".stl", ".glb", ".gltf", ".ifc", ".rvt", ".rfa"];
-const MAX_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_SIZE = 1024 * 1024 * 1024; // 1GB
 
 function formatSize(bytes: number) {
     if (bytes === 0) return "0 B";
@@ -149,7 +149,7 @@ export default function UploadPage() {
             return false;
         }
         if (f.size > MAX_SIZE) {
-            toast.error("Ukuran file melebihi 100MB");
+            toast.error("Ukuran file melebihi 1GB");
             return false;
         }
         return true;
@@ -361,7 +361,7 @@ export default function UploadPage() {
                                 format asli seperti .rvt, .skp, dll
                             </div>
                             <div style={{ fontSize: "11px", color: "var(--text-muted)" }}>
-                                Format: {ALLOWED_FORMATS.join(", ")} • Max: 100MB
+                                Format: {ALLOWED_FORMATS.join(", ")} • Max: 1GB
                             </div>
                         </div>
                     )}

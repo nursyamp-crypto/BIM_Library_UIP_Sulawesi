@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 
 const ALLOWED_FORMATS = [".skp", ".obj", ".fbx", ".stl", ".glb", ".gltf", ".ifc", ".rvt", ".rfa"];
 
-const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "104857600"); // 100MB
+const MAX_FILE_SIZE = parseInt(process.env.MAX_FILE_SIZE || "1073741824"); // 1GB
 
 export function validateFileType(filename: string): boolean {
     const ext = filename.toLowerCase().substring(filename.lastIndexOf("."));
